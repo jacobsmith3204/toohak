@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Toohak Host</title>
+    <link rel="stylesheet" href="assets/host.css">
+    <script src="assets/host.js"></script>
+</head>
+<body>
+    <div class="landing">
+        <h2>TOOHAK - host a game</h2>
+        
+        <input type="text" id="gameIdInput" placeholder="Game ID" required/> <br>
+        <input type="text" id="quizNameInput" placeholder="Quiz Name"> <br>
+        <textarea id="questions" rows="10" cols="60" placeholder="Enter questions here..."></textarea>
+        <div class ="info">
+            <p>Question format:</p>
+        <p>Question | answer1 | correct?(y/n) | answer2 | correct? | answer3 | correct? | answer4 | correct? | imageurl</p>
+        <p>questions 3&4 are optional, imageurl optional<p>
+        <p>Seperated by tab characters</p>
+        </div>
+        
+        <input type="checkbox" id="showQuestionsOnPlayerScreens"/> Show questions on player's screens?<br>
+        <button onclick="enterGame()">Enter Game</button>
+        <p><a href="kahootexport.js">script to generate questions from an existing kahoot</a></p>
+        
+    </div>
+    <div class="lobby">
+        <h1 class="quizName"></h1>
+        <h1>GAME ID: <span class="gameID">1234</span> </h1>
+        <div class="playerlist"></div>
+        <button onclick="nextQuestion()">Start game</button>
+    </div>
+    <div class="questionScreen">
+        <p>Question <span class="questionNumber"></span> of <span class="questionTotal"></span></p>
+        <h1 class="question"></h1>
+        <img src="" class="image" />
+        <div class="percentages"><!--how many people answered how much to what-->
+            <div class="a1"></div>
+            <div class="a2"></div>
+            <div class="a3"></div>
+            <div class="a4"></div>
+        </div>
+        <div class="answers">
+            <button class="answer a1">Welcome!</button>
+            <button class="answer a2">We hope you have fun!</button>
+            <button class="answer a3">I hope this works!</button>
+            <button class="answer a4">(^__^)</button>
+        </div>
+        <h1 class="countdown"></h1>
+        <button onclick="finishQuestion()" id="finishQuestionBtn">Skip</button>
+        <button onclick="showLeaderboard()" id="showLeaderboardBtn">Leaderboard</button>
+        <h3>GAME ID: <span class="gameID"></span> </h2>
+    </div>
+    <div class="leaderboard">
+        <h1 class="leaderboardtitle">Leader's Bored</h1>
+        <ol class="topFive">
+            <li></li>
+            <li></li>
+            <li></li>
+            <li></li>
+            <li></li>
+        </ol>
+        <button id="leaderboardNext" onclick="nextQuestion()">Next</button>
+        <button id="leaderboardGameOver" onclick="show(landing)">Back to landing page</button>
+        <h3>GAME ID: <span class="gameID"></span> </h2>
+    </div>
+    
+</body>
+</html>

@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Toohak Client</title>
+    <link href="https://fonts.googleapis.com/css?family=Roboto+Mono&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="assets/client.css">
+    <script src="assets/client.js"></script>
+</head>
+<body>
+    <div class="login">
+        <h2>TOOHAK</h2>
+        
+        <input type="text" id="gameIdInput" placeholder="Game ID" required/> <br>
+        <input type="text" id="nicknameInput" placeholder="Nickname" maxlength="20" required> <br>
+        <button onclick="enterGame()">Enter Game</button>
+        
+        <p>Or <a href="host.html">Host a Game</a></p>
+    </div>
+    <div class="lobby">
+        <h2>You're in!</h2>
+        <p>Wait for the game to start...</p>
+    </div>
+    <div class="main">
+        <h2 class="question">TOOHAK</h2>
+        <img src="" class="image"/>
+        <div class="answers">
+            <button id="a1" class="answer" onclick="checkAnswer(this)" value="0">Welcome!</button>
+            <button id="a2" class="answer" onclick="checkAnswer(this)" value="1">We hope you have fun!</button>
+            <button id="a3" class="answer" onclick="checkAnswer(this)" value="2">I hope this works!</button>
+            <button id="a4" class="answer" onclick="checkAnswer(this)" value="3">(^__^)</button>
+        </div>
+        
+    </div>
+    <div class="results">
+        <h2 class="name"></h2>
+        <h3>Score: <span class="score"></span> (+<span class="scoreChange"></span> pts)</h3>
+        <button class="leaveBtn" onclick="show(loginScreen)">Leave game</button>
+        <h4>You're in place #<span class="placing">1337</span>, behind <span class="behind">yourself</span></h4>
+    </div>
+</body>
+</html>

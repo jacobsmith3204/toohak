@@ -1,0 +1,54 @@
+/* CLIENT INDEX FILE  */
+body {
+    background-color:royalblue;
+    text-align: center;
+    color:white;
+    font-family: 'Roboto Mono', monospace;
+}
+.lobby, .main, .results {display: none;}
+.answers{
+    display:flex;
+    flex-wrap: wrap;
+    justify-content:space-around;
+    width:100%;
+}
+.answer{
+    display:block;
+    color:white;
+    border: white;
+    border-radius: 10px;
+    border-width: 1vw;
+    width:45%;
+    height:30vh;
+    margin:4px;
+}
+img {
+    min-width:20vw;
+    min-height:10vh;
+    max-width:90vw;
+    max-height:40vh;
+    margin:auto;
+}
+input{
+    margin:5px;
+}
+button{
+    margin:auto;
+}
+.results{
+    border-radius:5px ;
+    padding:15px;
+    margin:10px;
+}
+#a1{
+    background-color: orangered;
+}
+#a2{
+    background-color: orange;
+}
+#a3{
+    background-color: limegreen;
+}
+#a4{
+    background-color: rebeccapurple;
+}

@@ -1,0 +1,103 @@
+/* CLIENT INDEX FILE  */
+body {
+    background-color:royalblue;
+    text-align: center;
+    color:white;
+    font-family: 'Roboto Mono', monospace;
+}
+.lobby,.questionScreen,.leaderboard,.gameFinished {
+    display:none;
+}
+button {
+    color:black;
+    background-color: white;
+    padding:5px;
+    border:none;
+    border-radius:5px;
+    margin:5px;
+}
+
+input{
+    margin:5px;padding:5px;
+}
+textarea{
+    width:90%;
+}
+
+.gameID{
+    background-color:white;
+    color:black;
+    display:inline-block;
+    padding:5px;
+    border-radius:2px;
+}
+
+.playerlist {
+    display:flex;
+    flex-wrap:wrap;
+    justify-content: space-around;
+}
+.playerlist * {
+    display:block;
+    margin:10px;
+    padding:10px;
+    border-radius:5px;
+    background-color:mediumblue;
+}
+img {
+    min-width:20vw;
+    min-height:10vh;
+    max-width:90vw;
+    max-height:40vh;
+    margin:auto;
+}
+.answers{
+    display:flex;
+    flex-wrap: wrap;
+    justify-content:space-around;
+}
+.answer{
+    display:block;
+    color:white;
+    border: white;
+    border-radius: 10px;
+    border-width: 1vw;
+    width:47%;
+    height:15vh;
+    margin:1vw;
+    font-size:22pt;
+}
+.percentages, .topFive, .info{
+    margin:10px auto;
+    background-color: deepskyblue;
+    border-radius:4px;
+    padding:10px;
+}
+.percentages *{
+    height:8vh;
+    margin:5px 0px;
+    border-radius:3px;
+    font-size:28pt;
+}
+.topFive, .info{
+    width:70%
+}
+.topFive *{
+    font-size:28pt;
+}
+button {
+    margin:10px auto;
+    font-size:14pt;
+}
+.a1{
+    background-color: orangered;
+}
+.a2{
+    background-color: orange;
+}
+.a3{
+    background-color: limegreen;
+}
+.a4{
+    background-color: rebeccapurple;
+}

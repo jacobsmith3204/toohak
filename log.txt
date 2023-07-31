@@ -1,0 +1,10 @@
+OK, this time i'm actually gonna do this properly.
+Server logic in the server, host and client is "dumb", and most importantly, JSON for sending data.
+Still gonna use the host and client's css etc.
+
+Also, I want to make the server auto download/setup a quiz from kahoot as the quiz, rather than preparing them 
+beforehand. Why not just use kahoot? 10 player limit right now, plus "A LEARNING Experience" or whatever. Also,
+then I can display questions and answers on device (if playing remotely)
+
+The idea is to host it on my raspi when done at letsgo.hs.vc - this will also require me eventually implementing 
+WSS - websocket secure. Shouldn't be too hard tho.
