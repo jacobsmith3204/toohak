@@ -6,12 +6,58 @@
 
 
 
-var list = document.querySelectorAll(".question-list__item")
+var list = [];
+// gets all the visible questions
+document.querySelectorAll("li").forEach(e=>{    
+        if(e["className"].indexOf("question") != -1){
+            list.push(e);
+            console.log("found", e);
+        }
+    });
+
 var result = "";
 for (var item of list){
     var newline = ""
     var remaining = 4; 
-    newline+= item.querySelector(".question-media__text-inner-wrapper").children[0].innerHTML// add question to result
+    // gets the text within the questions, splits it into its lines
+    var obj = item.innerText.split('\n');
+
+
+    var type = obj[0].replace(/\d+\s-\s/g, "").toLowerCase();
+    switch(type){
+        case "slide": 
+            console.log("not a question:",obj);
+        break; 
+        case "quiz":
+            var answers = []; 
+            console.log(item.querySelector('div[aria-label$="image"]')); 
+
+            for(var j = 1, i = 3; i < obj.length; i++, j++){
+                console.log(item.querySelector(`div[aria-label^="Option ${j}"]`)); 
+                answers.push(obj[i]);
+            }
+            console.log("found a question: \n",obj[1], answers);
+            
+        break;
+        case "slider": 
+            console.log("can't do sliders", obj);
+        break; 
+        case "puzzle": 
+            console.log("can't do puzzles", obj);
+        break; 
+        default:
+            console.log("couldn't do", obj);
+        break;
+    }
+
+
+    newline+= item.innerText; 
+
+
+
+    //console.log(item.innerText);
+
+
     var alist = item.querySelectorAll(".choices__choice")
     for(var answer of alist){
         var newanswer = answer.children[0].children[1].innerHTML
