@@ -5,89 +5,112 @@
 // the questions will be outputted to the console in correct format for the kahoot game.
 
 
+var result = [];
 
-var list = [];
-// gets all the visible questions
-document.querySelectorAll("li").forEach(e=>{    
-        if(e["className"].indexOf("question") != -1){
-            list.push(e);
-            console.log("found", e);
-        }
-    });
-
-var result = "";
-for (var item of list){
-    var newline = ""
-    var remaining = 4; 
+// gets all the visible questions ( <li> thats class starts with "question" ) 
+var list = document.querySelectorAll('li[class^="question"]');
+for (var element of list) {
     // gets the text within the questions, splits it into its lines
-    var obj = item.innerText.split('\n');
-
-
-    var type = obj[0].replace(/\d+\s-\s/g, "").toLowerCase();
-    switch(type){
-        case "slide": 
-            console.log("not a question:",obj);
-        break; 
-        case "quiz":
-            var answers = []; 
-            console.log(item.querySelector('div[aria-label$="image"]')); 
-
-            for(var j = 1, i = 3; i < obj.length; i++, j++){
-                console.log(item.querySelector(`div[aria-label^="Option ${j}"]`)); 
-                answers.push(obj[i]);
-            }
-            console.log("found a question: \n",obj[1], answers);
-            
-        break;
-        case "slider": 
-            console.log("can't do sliders", obj);
-        break; 
-        case "puzzle": 
-            console.log("can't do puzzles", obj);
-        break; 
-        default:
-            console.log("couldn't do", obj);
-        break;
-    }
-
-
-    newline+= item.innerText; 
-
-
-
-    //console.log(item.innerText);
-
-
-    var alist = item.querySelectorAll(".choices__choice")
-    for(var answer of alist){
-        var newanswer = answer.children[0].children[1].innerHTML
-        newline += "\t" + newanswer; // add answers to result
-        if(answer.querySelector(".choices__choice--correct") != null){
-            // this is a "correct" answer option
-            newline += "\ty"
-        } else {
-            newline += "\tn"
-        }
-        remaining--;
-    }
-    // add extra tabs for the ones that should be remaining
-    for(var i = remaining; i > 0;i--){
-        newline += "\t\t";
-    }
-    // get the image and add the url to the end of the thing
-    let imagediv = item.querySelector(".background-image")
-    if(imagediv != null){
-        image = imagediv.style.backgroundImage
-        console.log(image)
-        image = image.substr(image.indexOf('"')+1)
-        console.log(image)
-        image = image.substr(0,image.indexOf('&width'))
-        console.log(image)
-        newline += "\t" + image
-    }
-    if(remaining <= 2) // there had to be at least 2 answers
-        result+=newline+"\n"
-}
-console.log(result);
+    var item = element.innerText.split('\n'); 
+    var type = item[0].replace(/\d+\s-\s/g, "").toLowerCase();
     
-        
+    switch (type) {
+        case "slide":
+            ExtractSlideData(element,item);
+            break;
+        case "quiz":
+            var obj = ExtractQuizData(element, item);
+            appendToResult(obj);
+            console.log("found a question: \n", obj);
+            break;
+        case "slider":
+            ExtractSliderData(element.item);
+            break;
+        case "puzzle":
+            ExtractPuzzleData(element,item);
+            break;
+        default:
+            console.log("failed to do: ", item);
+            break;
+    }
+}
+console.log(resultToString());
+
+
+
+function appendToResult(obj){
+    result.push(obj);
+}
+
+function resultToString(){
+    var string = "";
+    console.log(result);
+
+    result.forEach(obj => {
+        console.log(obj);
+        string += `${obj["title"]}\t`; 
+
+        obj["options"].forEach(option=> {
+            //console.log(option);
+            string += `${ option["option"]}\t${option["result"]}\t`; 
+        });
+
+        string += `${obj["imageURL"]}\n`; 
+    });
+    return string;    
+}
+
+  /*
+    // quiz formatted as follows 
+    '{
+        "type":"quiz",
+        "imageURL":"https://images-kahoot",
+        "title":"what is the answer?",
+        "options":[
+        {"option":"the correct one","result":"correct"},
+        {"option":"an incorrect one","result":"incorrect"},
+        {"option":"another correct one","result":"correct"},
+        ]}' 
+    */
+
+
+function ExtractSlideData(element,item){
+    console.log("not a question:", item);
+}
+
+function ExtractQuizData(element, item){
+    // extracts and formats the data into an object 
+    var imageElement = element.querySelector('div[aria-label$="image"]');
+    console.log(imageElement);
+
+    // extracts the options
+    var options = []
+    for (var j = 1, i = 3; i < item.length; i++, j++) {
+        // gets the correct option element (finding it from the parent <li> so need j to tell us what number we are looking for)
+        var optionElement = element.querySelector(`div[aria-label^="Option ${j}"]`);
+        // reads the end of the aria-label for the result 
+        var str = optionElement["ariaLabel"];
+        var result = str.substring(str.lastIndexOf(' ') + 1);
+        console.log(optionElement, result);
+        // pushes the result to the options array so we have everything in a nice list
+        options.push({ option: item[i], result: result });
+    }
+    
+     // returns the created quiz object
+    return {
+        type : "quiz",
+        title: item[1],  //the question
+        imageURL : imageElement["title"], //image url is on the title field of the element(for some reason)
+        options: options
+    }; 
+}
+
+function ExtractSliderData(element, item){
+    console.log("can't do sliders", item);
+}
+
+function ExtractPuzzleData(element,item){
+    console.log("can't do puzzles", item);
+}
+
+
