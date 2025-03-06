@@ -1,155 +1,380 @@
 const games = {}
 
 
-class Game {
-    
-    constructor(id,hostWS,showQuestionsOnClient,questions){
-        this.players= [];
-        this.questionStartTime = undefined;
-        this.totalAnswers = 0;
-        this.id= id;
-        this.host = hostWS;
-        this.showQuestionsOnClient = showQuestionsOnClient;
-        this.questions = [];
-        this.qi = -1;
-        this.addQuestionsFromString(questions);	
+// Player
+class Player {
+
+    constructor(socket) {
+        this.socket = socket;
+        this.connectedGame = undefined;
+        this.name = "";
+        this.score = 0;
+        this.qFinishTime = undefined;
+        this.answer = undefined;// index of answer
+        this.socket.on('message', this.onMessage.bind(this));
+        this.socket.on("close", this.disconnect.bind(this));
     }
-    
-    addQuestionsFromString(questions){
+
+    onMessage(str) {
+        // assuming data is always string
+        try {
+            console.log("player socket onMessage got message:" , str)
+            let data = JSON.parse(str)
+            switch (data.type) {
+                case "join":
+                    return this.joinGame(data);
+                case "host":
+                    return this.hostGame(data);
+                case "answer":
+                    return this.connectedGame.submitAnswer(this, data); 
+                // HOST SPECIFIC REQUEST TYPES
+                case "nextQuestion": // and for starting game as well
+                    return this.requestNextQuestion();
+                case "showOptions":
+                    return this.requestShowOptions();
+                case "showAnswer":
+                    return this.requestShowAnswer();
+                case "kickPlayer":
+                    return this.requestKickPlayer();
+                default:
+                    console.error(`onMessage default: type  ${data.type} is not a valid type`)
+            }
+        } catch (e) { console.error("onMessage: ERROR:",e) }
+    }
+
+    //#region USER REQUESTS 
+    joinGame(data) {
+        console.log("attempting join game");
+        // early exit for invalid game data
+        const game = Game.findGame(data.id); 
+        if (!game) { // if it can't find the game 
+            this.send({ type: "message", value: "Invalid game ID" });
+            return;
+        }
+        if (!this.name) { // if it already has an assigned name it should already be in a game
+            this.send({ type: "message", value: `You're already in a game, ${this.name}. Cheeky!` });
+            return;
+        }
+        if (game.getPlayer(data.name)) { // if it finds the players name already in the current game
+            this.send({ type: "message", value: "That name is already taken in that game" });
+            return;
+        }
+        // finds the game within the game dictionary obj and adds this  player
+        player.name = data.name;
+        game.addPlayer(this);
+    }
+
+    hostGame(data) {
+        // tries to create a game
+        var currentGame = Game.CreateGame(this, data);
+        // if successful sends a response to the host client
+        if (currentGame) {
+            this.connectedGame = currentGame;
+            this.send({
+                type: "host",
+                id: data.id
+            });
+        }
+    }
+    //#endregion
+
+
+    //#region HOST ONLY REQUESTS
+    // this.send({ type: "message", value: "You aren't no host"});
+    isHost() {
+        return (this.connectedGame && this.connectedGame.host == this);
+    }
+    // requests are host only
+    requestShowOptions() {
+        if (this.isHost())
+            this.connectedGame.sendAnsOptions();
+    }
+    requestNextQuestion() {
+        if (this.isHost())
+            this.connectedGame.sendQuestion();
+    }
+    requestShowAnswer() {
+        // send qstats to host, qFinished to client
+        if (this.isHost())
+            this.connectedGame.sendQuestionStats();
+    }
+    requestKickPlayer(data) {
+        let name = data["name"];
+        if (!this.isHost() || !name) return;
+
+        // finds the requested player by their name
+        let player = this.connectedGame.getPlayer(name);
+        if (player) {
+            // removes the player from the game
+            this.connectedGame.removePlayer(player);
+        }
+    }
+    //#endregion
+
+
+
+    // ConnectionManagment
+    kick(reason) {
+        this.send({ type: "kick", reason: reason });
+        this.disconnect(); 
+    }
+    disconnect() {
+        try {
+            if (this.connectedGame == undefined) return;
+            if (this.isHost()) return endGame();
+            // removes the player from the game
+            this.connectedGame.removePlayer(this); 
+        }
+        catch { error => { console.log(error) } }
+    }
+    send(data) {
+        if (typeof data.TYPE === 'string')
+            this.socket.send(data);
+        else
+            this.socket.send(JSON.stringify(data));
+    }
+}
+
+
+
+
+
+
+
+
+/* ==== GAME ====  */
+
+/*
+  // new json quiz formatted as follows 
+  '{
+      "type":"quiz",
+      "imageURL":"https://images-kahoot",
+      "title":"what is the answer?",
+      "options":[
+      {"option":"the correct one","result":"correct"},
+      {"option":"an incorrect one","result":"incorrect"},
+      {"option":"another correct one","result":"correct"},
+      ]}' 
+  */
+
+class Game {
+
+    constructor(host, data) { 
+        this.host = host;
+        this.players = [];
+        this.id = data["id"];
+        this.questions = Game.addQuestionsFromString(data.questions);
+        this.showQuestionsOnClient = data.showQuestionsOnClient;
+        //        
+        this.currentQuestionIndex = -1; 
+        this.questionStartTime = undefined;
+        this.answers = {};
+        // 
+        games[this.id] = this; 
+    }
+
+    static addQuestionsFromString(questionsString) {
         // NOw, parse the questions
-        let lines = questions.split("\n");
-        for(let element of lines){
+        let questions = []; 
+        let lines = questionsString.split("\n");
+        for (let element of lines) {
             var row = element.split("\t");
-            if(row.length <5) continue;
-            var newQ = {ans:[],correct:[]};
+            if (row.length < 5) continue;
+            var newQ = { ans: [], correct: [] };
             newQ.question = row[0];
             newQ.ans.push(row[1])// add answer 1
             newQ.correct.push(row[2] == "y")// add if answer 1 correct
             newQ.ans.push(row[3])// add answer 2
             newQ.correct.push(row[4] == "y")
-            if(row.length >= 7 && row[5] != ""){
+            if (row.length >= 7 && row[5] != "") {
                 newQ.ans.push(row[5])// add (optional) answer 3
                 newQ.correct.push(row[6] == "y")
-                if(row.length >= 9 && row[7] != ""){
+                if (row.length >= 9 && row[7] != "") {
                     newQ.ans.push(row[7])// add (optional) answer 4
                     newQ.correct.push(row[8] == "y")
                 }
             }
-            if(row.length >= 10 && row[9] != ""){
+            if (row.length >= 10 && row[9] != "") {
                 newQ.image = row[9]
             }
-            this.questions.push(newQ);
+            questions.push(newQ);
         };
-
+        return questions; 
     }
 
-
-
-    sendQuestion(){
-        this.qi++;
-        this.totalAnswers = 0;
-        // end game if got to last question
-        if(this.qi >= this.questions.length){
-            this.endGame();
+    static CreateGame(host, data) {
+        if (games[data.id] != undefined) {
+            console.log(`game ${data.id} already exists`)
+            host.send({ type: "message", value: "That game already exists" });
             return;
         }
-        let question = this.questions[this.qi];
-        if(this.showQuestionsOnClient){
-            for(let i of this.players){
-                i.send(JSON.stringify({
-                    type:"question",
-                    question:question.question,
-                    image:question.image,
-                }))
-            }
-        } 
-        this.host.send(JSON.stringify({
-            type:"question",
-            question:question.question,
-            questionNumber:this.qi + 1,
-            image:question.image,
-            total:this.questions.length,
-        }))
+        return new Game(host, data);
     }
-    sendAnsOptions(){
-        let question = this.questions[this.qi];
-        this.questionStartTime = new Date().getTime();
-        if(this.showQuestionsOnClient){
-            for(let i of this.players){
-                i.send(JSON.stringify({
-                    type:"answerText",
-                    answers:question.ans,
-                    image:question.image
-                }))
-            }
-        } else {
-            for(let i of this.players){
-                i.send(JSON.stringify({
-                    type:"answerCount",
-                    count:question.ans.length,
-                }))
-            }
+
+    static findGame(id){
+        return games[id];
+    }
+
+    //#region  PLAYER MANAGEMENT
+    static establishConnection(socket) {
+        // when we recieve a new websocket client we create a new player
+        // from there the player can decide to connect to a game via a json message.
+        players.push(new Player(socket));
+    }
+
+    addPlayer(player) {
+        // adds the player to this game 
+        if(this.players.indexOf(player) == -1) return; 
+        this.players.push(player)
+        // sets the players defaults for this game
+        player.connectedGame = this.id;
+        player.score = 0;
+
+        // sends a reply to both the host and the player 
+        this.host.send({ type: "addPlayer", name: player.name });
+        player.send({ type: "enterGame", });
+    }
+
+    getPlayer(name) {
+        return this.players.find(player => player.name === name);
+    }
+
+    removePlayer(player) {
+        let index = this.players.indexOf(player);
+        this.players.splice(index, 1);
+        // pushes the update to the host
+        this.host.send({ type: "removePlayer", name: player.name });
+    }
+    //#endregion
+
+
+
+    // QUIZ QUESTION GAME FLOW  
+    // push the question so everyone can see the question (delay before showing options)
+    pushQuestion() {
+        this.currentQuestionIndex++;
+        this.totalAnswers = 0;
+        // end game if got to last question
+        if (this.currentQuestionIndex >= this.questions.length) {
+            this.finishGame();
+            return;
         }
-        this.host.send(JSON.stringify({
-            type:"answerText",
-            answers:question.ans,
-            image:question.image
-        }))
+        // sends the currentQuestion to the host player
+        let currentQuestion = this.questions[this.currentQuestionIndex];
+        this.host.send({
+            type: "question",
+            question: currentQuestion.question,
+            questionNumber: this.currentQuestionIndex + 1,
+            image: currentQuestion.image,
+            total: this.questions.length,
+        });
+        // if allowed sends the question to the other players 
+        if (this.showQuestionsOnClient) {
+            this.players.forEach(player => player.send({
+                type: "question",
+                question: currentQuestion.question,
+                image: currentQuestion.image,
+            }));
+        }
     }
-    sendQuestionStats(){
+
+    // push the choices to everyone  for them to choose
+    pushAnsOptions() {
+        let currentQuestion = this.questions[this.currentQuestionIndex];
+        this.questionStartTime = new Date().getTime();
+
+        // sends the question response options to the player
+        this.host.send({
+            type: "answerText",
+            answers: currentQuestion.ans,
+            image: currentQuestion.image
+        });
+
+        // figures out what data it can show the players then sends it to all of them 
+        let data =
+            (this.showQuestionsOnClient) ?
+                {
+                    type: "answerText",
+                    answers: currentQuestion.ans,
+                    image: currentQuestion.image
+
+                } : {
+                    type: "answerCount",
+                    count: currentQuestion.ans.length,
+                }
+        this.players.forEach(player => player.send(data));
+    }
+
+    submitAnswer(player,data){
+        if(this.answers[player]){
+            console.log(`player ${player.name} has already submitted an answer`);
+            return; 
+        }
+        this.answers[player] = {
+            answer : data.answer, 
+            qFinishTime : new Date().getTime(),
+        }  
+        if (this.answers.length == this.players.length) this.connectedGame.sendQuestionStats()
+    }
+
+    // once all have chosen or the time has run out, we show the results
+    sendQuestionStats() {
         // first, calculate who was right and who was wrong for the question we just did, and update scores
         // also calculate number of people to choose each answer
-        let question = this.questions[this.qi];
+        let question = this.questions[this.currentQuestionIndex];
         let tally = new Array(question.ans.length).fill(0)// make an array to tally up who chose what answer
-        for(let player of this.players){
+        for (let player of this.players) {
             let scoreDelta = 0;
             let correct = false;
 
-            if(player.answer != undefined){
+            if (player.answer != undefined) {
                 // increment tally of who chose what
                 tally[player.answer]++;
                 // award points if correct
-                if(question.correct[player.answer]){
+                if (question.correct[player.answer]) {
                     // scoring: 500 points plus 500pts * percentage of time left of 20seconds * 500
-                    scoreDelta = 500 + Math.ceil((20000-(player.qFinishTime - this.questionStartTime))/(20000)*500)
+                    scoreDelta = 500 + Math.ceil((20000 - (player.qFinishTime - this.questionStartTime)) / (20000) * 500)
                     player.score += scoreDelta
-                    correct=true;
+                    correct = true;
                 }
             }
-            
-            player.send(JSON.stringify({
-                type:"qFinished",
-                score:player.score,
-                scoreChange:scoreDelta,
-                correct:correct,
-                gameOver:this.qi >= this.questions.length -1// game over if that was the last question
-            }))
+
+            player.send({
+                type: "qFinished",
+                score: player.score,
+                scoreChange: scoreDelta,
+                correct: correct,
+                gameOver: this.currentQuestionIndex >= this.questions.length - 1// game over if that was the last question
+            });
             player.answer = undefined;
             player.qfinishTime = undefined;
-            
+
         }
         // next, sort results (descending order of score), then tell each player their placing
-        this.players.sort((a,b)=>{return  b.score - a.score})
-        for(let i = 0; i < this.players.length;i++){
-            this.players[i].send(JSON.stringify({
-                type:"placingUpdate",
-                place:i+1,
-                behind:i > 0 ? this.players[i-1].name  : "nobody, good job!"
-            }))
+        this.players.sort((a, b) => { return b.score - a.score })
+        for (let i = 0; i < this.players.length; i++) {
+            this.players[i].send({
+                type: "placingUpdate",
+                place: i + 1,
+                behind: i > 0 ? this.players[i - 1].name : "nobody, good job!"
+            });
         }
         // finally, send stats to host
-        this.host.send(JSON.stringify({
-            type:"qstats",
-            percentages:tally.map(val=>(val * 100 / this.players.length)),// convert tally to percentage chosen
-            correct:question.correct,
-            leaders:this.players.slice(0,5).map(player=>player.name),// get the leader's names
-            gameOver:this.qi >= this.questions.length -1
-        }))
-        if(this.qi >= this.questions.length -1) this.endGame();
+        this.host.send({
+            type: "qstats",
+            percentages: tally.map(val => (val * 100 / this.players.length)),// convert tally to percentage chosen
+            correct: question.correct,
+            leaders: this.players.slice(0, 5).map(player => player.name),// get the leader's names
+            gameOver: this.currentQuestionIndex >= this.questions.length - 1
+        });
+        if (this.currentQuestionIndex >= this.questions.length - 1) this.deleteGame();
     }
-    endGame(){
+
+
+    // GAME CONTROLS
+    deleteGame() {
         // deletes all references to itself.
-        this.players.forEach(ws=>{
+        this.players.forEach(ws => {
             ws.connectedGame = undefined;
             ws.name = "";
             ws.score = 0;
@@ -157,139 +382,23 @@ class Game {
             ws.qFinishTime = undefined;
         })
         this.host.connectedGame = undefined;
-        delete game[this.id];
+        delete games[this.id];
     }
-    
-    static establishConnection(){
+    finishGame() {
 
-        ws.connectedGame = undefined;
-        ws.name = "";
-        ws.score = 0;
-        ws.qFinishTime = undefined;
-        ws.answer = undefined;// index of answer
-        ws.on('message', function incoming(str) {// assuming data is always string
-            try{
-            console.log("message:" + str)
-            let data = JSON.parse(str)
-            switch(data.type){
-                case "join":
-                    if(game[data.id] == undefined || game[data.id] == null){
-                        ws.send(JSON.stringify({
-                            type:"message",value:"Invalid game ID"
-                        }))
-                        return;
-                    }
-                    if(!(ws.name == undefined || ws.name == "")){
-                        ws.send(JSON.stringify({
-                            type:"message",value:"You're already in a game. Cheeky!"
-                        }))
-                        console.log(ws.name)
-                        return;
-                    }
-                    if(game[data.id].players.indexOf(data.name) > -1){
-                        ws.send(JSON.stringify({
-                            type:"message",
-                            value:"That name is already taken in that game"
-                        }))
-                        return;
-                    } 
-                    game[data.id].players.push(ws)
-                    ws.connectedGame = game[data.id]
-                    ws.name = data.name;
-                    ws.send(JSON.stringify({
-                        type:"enterGame",
-                    }))
-                    ws.connectedGame.host.send(JSON.stringify({type:"addPlayer",name:data.name}));
-                    ws.score = 0;
-                    break;
-                case "host":
-                    if(game[data.id] != undefined){
-                        ws.send(JSON.stringify({
-                            type:"message",value:"That game already exists"
-                        }))
-                        return;
-                    }
-                    game[data.id] = new Game(data.id,ws,data.questions,data.showQuestionsOnClient)
-                    ws.connectedGame = game[data.id]
-                    ws.send(JSON.stringify({
-                        type:"host",
-                        id:data.id
-                    }))
-                    break;
-                case "nextQuestion": // and for starting game as well
-                    if(!isHost(ws)) break;
-    
-                    ws.connectedGame.sendQuestion();
-                    break;
-                case "answer":
-                    ws.answer = data.answer;
-                    ws.connectedGame.totalAnswers++;
-                    ws.qFinishTime = new Date().getTime();
-                    if(ws.connectedGame.totalAnswers == ws.connectedGame.players.length) ws.connectedGame.sendQuestionStats()
-                    break;
-                case "showOptions": 
-                    if(!isHost(ws)) return;
-                    ws.connectedGame.sendAnsOptions();
-                    break;
-                case "showAnswer":
-                    // send qstats to host, qFinished to client
-                    if(!isHost(ws)) return;
-                    ws.connectedGame.sendQuestionStats();
-                    break;
-                case "kickPlayer":
-                    if(!isHost(ws)) break;
-                    let index = ws.connectedGame.players.indexOf(data.name)
-                    if(index > -1){
-                        ws.connectedGame.players.splice(index,1);
-                        ws.send(JSON.stringify({
-                            type:"removePlayer",
-                            name:data.name
-                        }))
-                    }
-                    break;
-                default:
-                    console.warn("type " + data.type +"is not  a valid type")
-            }
-            } catch ( e){console.log(e)}
-        });
-        ws.on("close",()=>{
-            try{
-    
-            if(ws.connectedGame == undefined) return
-            if(ws.connectedGame.host == ws){
-                //KICK EVERYONE FROM GAME
-                ws.connectedGame.players.forEach(player => {
-                    player.send(JSON.stringify({
-                        type:"kick",
-                        reason:"Host Left."
-                    }))
-                });
-                ws.connectedGame.endGame();
-                return
-            }
-            ws.connectedGame.host.send(JSON.stringify({
-                type:"removePlayer",
-                name:ws.name
-            }))
-            ws.connectedGame.players.splice (ws.connectedGame.players.indexOf(ws), 1);
-            } catch{error =>{console.log(error)}}
-    
-        })
+    }
+    endGame() {
+        // KICK EVERYONE FROM GAME
+        this.kickPlayers(ws.connectedGame.players, "Host Left.");
+        ws.connectedGame.deleteGame();
+    }
 
+    // game user control
+    kickPlayers(players, reason) {
+        players.forEach((player) => player.kick(reason));
     }
 }
 
 
 
-
-
-
-function isHost(ws){
-	if(ws.connectedGame == undefined || ws.connectedGame.host != ws){
-		ws.send(JSON.stringify({
-			type:"message",value:"You aren't no host"
-		}))
-		return false;
-	}
-	return true;
-}
+module.exports = { Game, Player};
