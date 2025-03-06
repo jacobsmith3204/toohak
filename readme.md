@@ -4,6 +4,6 @@ usage:
 	node server.js
 
 	it will print the server webaddress in the terminal
-	default address is [Link Text](http://localhost:8000/index.html)
+	default address is:	http://localhost:8000/index.html
 
 go to the http port and check it out!
