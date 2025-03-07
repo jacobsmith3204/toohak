@@ -1,5 +1,5 @@
 "use strict"
-console.log("starting...")
+console.log("starting... NEW")
 // http server dependencies  
 const http = require('http');
 const fs = require('fs');
@@ -7,7 +7,7 @@ const path = require('path');
 const url = require('url');
 // game socket server dependencies 
 const WebSocket = require('ws');
-const Game = require('./game.js'); 
+const {Game} = require('./game.js'); 
 
 
 
@@ -34,12 +34,9 @@ console.log("Started Websocket server")
 
 // sends all socket connections to the game file to establish a connection to a game
 wss.on('connection', stream => { 
+	console.log("established connection to new server");
 	Game.establishConnection(stream);
-	console.log("connecting to game");
 });
-
-
-
 
 
 
@@ -124,3 +121,6 @@ function handleFileServerRequests(req, res){
 		}
 	}
 }
+
+
+module.exports = {wss};

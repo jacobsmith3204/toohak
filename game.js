@@ -1,4 +1,3 @@
-const games = {}
 
 
 // Player
@@ -18,7 +17,7 @@ class Player {
     onMessage(str) {
         // assuming data is always string
         try {
-            console.log("player socket onMessage got message:" , str)
+            console.log("player socket onMessage got message:", str)
             let data = JSON.parse(str)
             switch (data.type) {
                 case "join":
@@ -26,7 +25,7 @@ class Player {
                 case "host":
                     return this.hostGame(data);
                 case "answer":
-                    return this.connectedGame.submitAnswer(this, data); 
+                    return this.connectedGame.submitAnswer(this, data);
                 // HOST SPECIFIC REQUEST TYPES
                 case "nextQuestion": // and for starting game as well
                     return this.requestNextQuestion();
@@ -39,20 +38,21 @@ class Player {
                 default:
                     console.error(`onMessage default: type  ${data.type} is not a valid type`)
             }
-        } catch (e) { console.error("onMessage: ERROR:",e) }
+        } catch (e) { console.error("onMessage: ERROR:", e) }
     }
 
     //#region USER REQUESTS 
     joinGame(data) {
         console.log("attempting join game");
         // early exit for invalid game data
-        const game = Game.findGame(data.id); 
+        var game = Game.findGame(data.id);
         if (!game) { // if it can't find the game 
             this.send({ type: "message", value: "Invalid game ID" });
             return;
         }
-        if (!this.name) { // if it already has an assigned name it should already be in a game
-            this.send({ type: "message", value: `You're already in a game, ${this.name}. Cheeky!` });
+        if (this.name) { // if it already has an assigned name it should already be in a game
+            this.send({ type: "message", value: `You're already in a game. Cheeky!` });
+            console.log(this.name, "is already in a game");
             return;
         }
         if (game.getPlayer(data.name)) { // if it finds the players name already in the current game
@@ -60,8 +60,10 @@ class Player {
             return;
         }
         // finds the game within the game dictionary obj and adds this  player
-        player.name = data.name;
-        game.addPlayer(this);
+        this.name = data.name;
+
+        //console.log("trying to add player to ", game);
+        Game.addPlayer(game, this);
     }
 
     hostGame(data) {
@@ -116,14 +118,14 @@ class Player {
     // ConnectionManagment
     kick(reason) {
         this.send({ type: "kick", reason: reason });
-        this.disconnect(); 
+        this.disconnect();
     }
     disconnect() {
         try {
             if (this.connectedGame == undefined) return;
             if (this.isHost()) return endGame();
             // removes the player from the game
-            this.connectedGame.removePlayer(this); 
+            this.connectedGame.removePlayer(this);
         }
         catch { error => { console.log(error) } }
     }
@@ -158,24 +160,25 @@ class Player {
   */
 
 class Game {
+    static games = {}
 
-    constructor(host, data) { 
+    constructor(host, data) {
         this.host = host;
         this.players = [];
         this.id = data["id"];
         this.questions = Game.addQuestionsFromString(data.questions);
         this.showQuestionsOnClient = data.showQuestionsOnClient;
         //        
-        this.currentQuestionIndex = -1; 
+        this.currentQuestionIndex = -1;
         this.questionStartTime = undefined;
         this.answers = {};
         // 
-        games[this.id] = this; 
+        Game.games[this.id] = this;
     }
 
     static addQuestionsFromString(questionsString) {
         // NOw, parse the questions
-        let questions = []; 
+        let questions = [];
         let lines = questionsString.split("\n");
         for (let element of lines) {
             var row = element.split("\t");
@@ -199,11 +202,11 @@ class Game {
             }
             questions.push(newQ);
         };
-        return questions; 
+        return questions;
     }
 
     static CreateGame(host, data) {
-        if (games[data.id] != undefined) {
+        if (Game.games[data.id] != undefined) {
             console.log(`game ${data.id} already exists`)
             host.send({ type: "message", value: "That game already exists" });
             return;
@@ -211,27 +214,30 @@ class Game {
         return new Game(host, data);
     }
 
-    static findGame(id){
-        return games[id];
+    static findGame(id) {
+        return Game.games[id];
     }
 
     //#region  PLAYER MANAGEMENT
     static establishConnection(socket) {
         // when we recieve a new websocket client we create a new player
         // from there the player can decide to connect to a game via a json message.
-        players.push(new Player(socket));
+        // player constructor handles the setup
+        new Player(socket);
     }
 
-    addPlayer(player) {
-        // adds the player to this game 
-        if(this.players.indexOf(player) == -1) return; 
-        this.players.push(player)
-        // sets the players defaults for this game
-        player.connectedGame = this.id;
-        player.score = 0;
+    static addPlayer(game, player) {
+        // exits early if it already has the player 
+        if (game.players.indexOf(player) != -1) return;
 
+        // otherwise adds the player
+        console.log("adding player");
+        game.players.push(player)
+        // sets the players defaults for this game
+        player.connectedGame = Game.findGame(game.id);
+        player.score = 0;
         // sends a reply to both the host and the player 
-        this.host.send({ type: "addPlayer", name: player.name });
+        game.host.send({ type: "addPlayer", name: player.name });
         player.send({ type: "enterGame", });
     }
 
@@ -256,7 +262,7 @@ class Game {
         this.totalAnswers = 0;
         // end game if got to last question
         if (this.currentQuestionIndex >= this.questions.length) {
-            this.finishGame();
+            this.endGame();
             return;
         }
         // sends the currentQuestion to the host player
@@ -305,15 +311,15 @@ class Game {
         this.players.forEach(player => player.send(data));
     }
 
-    submitAnswer(player,data){
-        if(this.answers[player]){
+    submitAnswer(player, data) {
+        if (this.answers[player]) {
             console.log(`player ${player.name} has already submitted an answer`);
-            return; 
+            return;
         }
         this.answers[player] = {
-            answer : data.answer, 
-            qFinishTime : new Date().getTime(),
-        }  
+            answer: data.answer,
+            qFinishTime: new Date().getTime(),
+        }
         if (this.answers.length == this.players.length) this.connectedGame.sendQuestionStats()
     }
 
@@ -382,10 +388,7 @@ class Game {
             ws.qFinishTime = undefined;
         })
         this.host.connectedGame = undefined;
-        delete games[this.id];
-    }
-    finishGame() {
-
+        delete Game.games[this.id];
     }
     endGame() {
         // KICK EVERYONE FROM GAME
@@ -401,4 +404,4 @@ class Game {
 
 
 
-module.exports = { Game, Player};
+module.exports = { Game, Player };

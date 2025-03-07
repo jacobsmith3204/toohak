@@ -1,13 +1,10 @@
 "use strict"
-console.log("starting...")
+console.log("starting... old")
 const WebSocket = require('ws');
-
-var wss = new WebSocket.Server({
+const wss = new WebSocket.Server({
     port:8001
 });
-
 class Game {
-	
 	constructor(id,hostWS,questions,showQuestionsOnClient){
 		this.players= [];
 		this.questionStartTime = undefined;
@@ -17,7 +14,6 @@ class Game {
 		this.showQuestionsOnClient = showQuestionsOnClient;
 		this.questions = [];
 		this.qi = -1;
-		// NOw, parse the questions
 		let lines = questions.split("\n");
 		for(let element of lines){
 			var row = element.split("\t");
@@ -42,11 +38,9 @@ class Game {
 			this.questions.push(newQ);
 		};
 	}
-	
 	sendQuestion(){
 		this.qi++;
 		this.totalAnswers = 0;
-		// end game if got to last question
 		if(this.qi >= this.questions.length){
 			this.endGame();
 			return;
@@ -95,26 +89,19 @@ class Game {
 		}))
 	}
 	sendQuestionStats(){
-		// first, calculate who was right and who was wrong for the question we just did, and update scores
-		// also calculate number of people to choose each answer
 		let question = this.questions[this.qi];
 		let tally = new Array(question.ans.length).fill(0)// make an array to tally up who chose what answer
 		for(let player of this.players){
 			let scoreDelta = 0;
 			let correct = false;
-
 			if(player.answer != undefined){
-				// increment tally of who chose what
 				tally[player.answer]++;
-				// award points if correct
 				if(question.correct[player.answer]){
-					// scoring: 500 points plus 500pts * percentage of time left of 20seconds * 500
 					scoreDelta = 500 + Math.ceil((20000-(player.qFinishTime - this.questionStartTime))/(20000)*500)
 					player.score += scoreDelta
 					correct=true;
 				}
 			}
-			
 			player.send(JSON.stringify({
 				type:"qFinished",
 				score:player.score,
@@ -123,10 +110,8 @@ class Game {
 				gameOver:this.qi >= this.questions.length -1// game over if that was the last question
 			}))
 			player.answer = undefined;
-			player.qfinishTime = undefined;
-			
+			player.qfinishTime = undefined;	
 		}
-		// next, sort results (descending order of score), then tell each player their placing
 		this.players.sort((a,b)=>{return  b.score - a.score})
 		for(let i = 0; i < this.players.length;i++){
 			this.players[i].send(JSON.stringify({
@@ -135,7 +120,6 @@ class Game {
 				behind:i > 0 ? this.players[i-1].name  : "nobody, good job!"
 			}))
 		}
-		// finally, send stats to host
 		this.host.send(JSON.stringify({
 			type:"qstats",
 			percentages:tally.map(val=>(val * 100 / this.players.length)),// convert tally to percentage chosen
@@ -146,7 +130,6 @@ class Game {
 		if(this.qi >= this.questions.length -1) this.endGame();
 	}
 	endGame(){
-		// deletes all references to itself.
 		this.players.forEach(ws=>{
 			ws.connectedGame = undefined;
 			ws.name = "";
@@ -159,7 +142,7 @@ class Game {
 	}
 	
 }
-let game ={};
+const game = {};
 
 wss.on('connection', function connection(ws) {
 	console.log("established connection with old server");
@@ -258,7 +241,6 @@ wss.on('connection', function connection(ws) {
 
 		if(ws.connectedGame == undefined) return
 		if(ws.connectedGame.host == ws){
-			//KICK EVERYONE FROM GAME
 			ws.connectedGame.players.forEach(player => {
 				player.send(JSON.stringify({
 					type:"kick",
@@ -274,7 +256,6 @@ wss.on('connection', function connection(ws) {
 		}))
 		ws.connectedGame.players.splice (ws.connectedGame.players.indexOf(ws), 1);
 		} catch{error =>{console.log(error)}}
-
 	})
 });
 function isHost(ws){
@@ -287,6 +268,4 @@ function isHost(ws){
 	return true;
 }
 console.log("Started Websocket server")
-
-
-module.exports = { Game };
+module.exports = { Game, wss , game};
