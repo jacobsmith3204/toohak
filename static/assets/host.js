@@ -1,4 +1,4 @@
-var connection = new WebSocket("wss://letsgo.hs.vc/node/toohak/");
+var connection = new WebSocket("ws://localhost:8001");
 var landing,lobby,questionScreen,leaderboard,gameFinished;
 var answers, percentages, topFive,image,playerlist
 var onLastQuestion;

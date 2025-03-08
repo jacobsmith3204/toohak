@@ -15,13 +15,7 @@ const EventEmitter = require("events");
 const eventBus = new EventEmitter();
 
 
-var data = {
-    id: "0",
-    questions: "",
-    showQuestionsOnClient: true
-}
-
-SetupOverrides();
+SetupConsoleOverrides();
 // creates some objects to use in the tests
 //const wsN = new WebSocket("ws://localhost:8001");
 //const wsO = new WebSocket("ws://localhost:8001");
@@ -41,7 +35,7 @@ newWebsocket.emit("connection", wsN);
 
 console.logWithColor("\n - attempting to host a game... sending host request to both and asserting if they are the same");
 // sets up a host request 
-var hostRequest = { type: "host", id: "0", name: "player", questions: "why did the chicken cross the road\t\t\t\t\t" };
+var hostRequest = { type: "host", id: "0", name: "player", questions: "why did the chicken cross the road\tans\ty\twro\tn\twro2\tn\twro3\tn\thttps://www.google.com/favicon.ico" };
 
 
 // REQUIRED TO SETUP THE GAME 
@@ -49,8 +43,9 @@ console.assert(IsWSresponseIsSame(hostRequest), "host requests failed to match")
 
 
 console.log("fetching (the newly created) game via its id...")
-const o = OldGames[data.id];
-const n = NewGames[data.id];
+
+const o = OldGames["0"];
+const n = NewGames["0"];
 console.assert(o != null && n != null, "failed to get both games", "got both games");
 // manually create games
 //const o = new OldGame(data.id, wsO, data.questions, data.showQuestionsOnClient);// id,hostWS,questions,showQuestionsOnClient
@@ -74,9 +69,9 @@ console.assert(n["showQuestionsOnClient"] === o["showQuestionsOnClient"], "showQ
 
 
 
-console.assert(IsWSresponseIsSame({ type: "join", name: "player1", id: data.id }), "player joining response is different");
+console.assert(IsWSresponseIsSame({ type: "join", name: "player1", id: "0" }), "player joining response is different");
 //
-console.assert(IsWSresponseIsSame({ type: "join", name: "player1", id: data.id }), "player joining while already in a game response is different");
+console.assert(IsWSresponseIsSame({ type: "join", name: "player1", id: "0" }), "player joining while already in a game response is different");
 // 
 
 console.assert(o.players.length === n.players.length && o.players.length > 0, ` failed adding the new player?` , "players were added sucessfully");
@@ -117,9 +112,6 @@ function IsWSresponseIsSame(request) {
         console.log("matching response: ", responseNew);
     return matches;
 }
-
-
-
 
 
 
@@ -189,8 +181,8 @@ function CreateFakeWS(sentDataEvent) {
 }
 
 
-function SetupOverrides() {
 
+function SetupConsoleOverrides() {
     // overrides the console assert function so i can pass it functions to evaluate
     console.assert = function (condition, message, id) {
         switch (typeof condition) {
@@ -213,47 +205,3 @@ function SetupOverrides() {
         console.log(`\x1b[33m ${message}\x1b[0m`);
     }
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-// Create a fake WebSocket object with basic send/receive capabilities
-/*const mockWs = {
-    send: (msg) => console.log("Server sent message:", msg),
-    on: (event, callback) => {
-        if (event === "message") {
-            // Simulate receiving a message
-            setTimeout(() => callback(JSON.stringify({ type: "connect", message: "Mock connection" })), 100);
-        }
-    },
-    readyState: WebSocket.OPEN
-};*/
-// Manually trigger the connection event
-
-
-
-/*
-// not working (i imagine its expecting the ip above to respond)
-wsO.onopen = function () {
-    console.log("Connected wsO to the WebSocket server");
-    // Send the "connect" event and pass data
-    wsO.send(JSON.stringify({ type: "connect", message: "Client connected" }));
-};
-wsN.onopen = function () {
-    console.log("Connected wsO to the WebSocket server");
-    // Send the "connect" event and pass data
-    wsN.send(JSON.stringify({ type: "connect", message: "Client connected" }));
-};
-*/

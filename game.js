@@ -5,18 +5,20 @@ class Player {
 
     constructor(socket) {
         this.socket = socket;
-        this.connectedGame = undefined;
-        this.name = "";
+        this.connectedGame;
+        this.name;
         this.score = 0;
-        this.qFinishTime = undefined;
-        this.answer = undefined;// index of answer
+        this.qFinishTime;
+        this.answer;
         this.socket.on('message', this.onMessage.bind(this));
         this.socket.on("close", this.disconnect.bind(this));
     }
 
-    onMessage(str) {
-        // assuming data is always string
+    async onMessage(str) {
         try {
+            str = SanitiseInput(str); 
+            
+            // converts the string to a json object, then passes it through to the request handler
             console.log("player socket onMessage got message:", str)
             let data = JSON.parse(str)
             switch (data.type) {
@@ -39,7 +41,27 @@ class Player {
                     console.error(`onMessage default: type  ${data.type} is not a valid type`)
             }
         } catch (e) { console.error("onMessage: ERROR:", e) }
+
+
+        function SanitiseInput(data){
+            var str; 
+            if (typeof data === "string" && data.startsWith("<Buffer")) {
+                // Extract hex values from the string and recreate the Buffer
+                const hexValues = data.match(/[\da-fA-F]{2}/g); // Get hex pairs
+                if (hexValues) {
+                    data = Buffer.from(hexValues.map(byte => parseInt(byte, 16))); // Convert back to Buffer
+                }
+            }
+            // Convert Buffer to String if necessary
+            if (Buffer.isBuffer(data))  str = data.toString(); // Convert Buffer to string
+            else if (data instanceof ArrayBuffer)  str = Buffer.from(data).toString(); // Convert ArrayBuffer to string
+            else str = data;     
+            return str; 
+        }
     }
+
+    
+
 
     //#region USER REQUESTS 
     joinGame(data) {
@@ -68,10 +90,12 @@ class Player {
 
     hostGame(data) {
         // tries to create a game
-        var currentGame = Game.CreateGame(this, data);
+        console.log("attempting to host game"); 
+        var game = Game.CreateGame(this, data);
+
         // if successful sends a response to the host client
-        if (currentGame) {
-            this.connectedGame = currentGame;
+        if (game) {
+            this.connectedGame = game;
             this.send({
                 type: "host",
                 id: data.id
@@ -92,8 +116,10 @@ class Player {
             this.connectedGame.sendAnsOptions();
     }
     requestNextQuestion() {
-        if (this.isHost())
+        if (this.isHost()){
+            console.log("connected game: ", this.connectedGame);
             this.connectedGame.sendQuestion();
+        }
     }
     requestShowAnswer() {
         // send qstats to host, qFinished to client
@@ -139,13 +165,7 @@ class Player {
 
 
 
-
-
-
-
-
-/* ==== GAME ====  */
-
+// ==== GAME ====  //
 /*
   // new json quiz formatted as follows 
   '{
@@ -173,6 +193,7 @@ class Game {
         this.questionStartTime = undefined;
         this.answers = {};
         // 
+        console.log("created game", this);
         Game.games[this.id] = this;
     }
 

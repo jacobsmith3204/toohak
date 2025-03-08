@@ -1,4 +1,4 @@
-var connection = new WebSocket("wss://letsgo.hs.vc/node/toohak/");
+var connection = new WebSocket("ws://localhost:8001");
 var question, ans,score,scoreChange,placing,behind,image;
 var correctSound, incorrectSound;
 var mainScreen,loginScreen,lobby,resultsScreen;

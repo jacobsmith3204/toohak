@@ -30,11 +30,14 @@ console.log("Started file server")
 const wss = new WebSocket.Server({
     port:SOCKETPORT
 });
-console.log("Started Websocket server")
+console.log(`Started Websocket server at http://localhost:${SOCKETPORT}`)
 
 // sends all socket connections to the game file to establish a connection to a game
 wss.on('connection', stream => { 
+
 	console.log("established connection to new server");
+
+	// CREATES THE PLAYER/CLIENT 
 	Game.establishConnection(stream);
 });
 
@@ -46,8 +49,6 @@ function handleFileServerRequests(req, res){
 	const parsedUrl = url.parse(req.url, true);
     const filePath = path.join(FILE_DIR, parsedUrl.pathname.substring(1)); // Remove leading "/"
 	// 
-	console.log(parsedUrl, filePath);
-
 	switch(req.method){
 		case 'GET': 
 			HandleGet(); 
@@ -68,9 +69,9 @@ function handleFileServerRequests(req, res){
         	        res.end('File not found');
 					console.log("couldn't find file: " , filePath);
         	    } else {	
-        	        res.writeHead(200, { 'Content-Type': GetContentType()});
+        	        res.writeHead(200, GetContentHeaders());
         	        res.end(data);
-					console.log("sent file: " , filePath, "with headers",  GetContentType());
+					console.log("sent file: " , filePath, "with headers",  GetContentHeaders());
         	    }
         	});
 		}
@@ -86,8 +87,7 @@ function handleFileServerRequests(req, res){
     		res.end('Hello, World!\n');
 		}
 		// 
-		function HandlePost(){
-				
+		function HandlePost(){	
 			/*
 				 // Write data to file
 				 let body = '';
@@ -111,12 +111,19 @@ function handleFileServerRequests(req, res){
 		}
 
 		// helper function to send the right response headers based on the content
-		function GetContentType(){
+		function GetContentHeaders(){
 			let match = filePath.match(/\.[\w.]+$/)[0]; // gets the file extention matches extentions with 2 "." just need to add it as a case
 			//console.log(match);
 			switch(match){
-				case ".html": return 'text/html; charset=UTF-8'; 
-				default: return 'text/plain';  
+				case ".html": return { 'Content-Type': 'text/html; charset=UTF-8'};
+				case ".css": return { 'Content-Type':'text/css'}; 
+				case ".ico": return { 'Content-Type':'image'};
+				case ".png": return { 'Content-Type':'image/png'};  
+				case ".jpg": return { 'Content-Type':'image/jpg'}; 	
+				case ".webp": return { 'Content-Type':'image/webp'};  
+				case ".js": return { 'Content-Type':'application/javascript'};    
+				case ".mp3": return { 'Content-Type':'audio/mpeg', 'Accept-Ranges': 'bytes', 'Cache-Control': 'public, max-age=31536000, immutable', };  
+				default: return { 'Content-Type':'text/plain'};  
 			}
 		}
 	}
