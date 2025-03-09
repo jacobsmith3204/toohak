@@ -67,7 +67,7 @@ class Player {
     joinGame(data) {
         console.log("attempting join game");
         // early exit for invalid game data
-        var game = Game.findGame(data.id);
+        const game = Game.findGame(data.id);
         if (!game) { // if it can't find the game 
             this.send({ type: "message", value: "Invalid game ID" });
             return;
@@ -85,7 +85,7 @@ class Player {
         this.name = data.name;
 
         //console.log("trying to add player to ", game);
-        Game.addPlayer(game, this);
+        game.addPlayer(this);
     }
 
     hostGame(data) {
@@ -113,12 +113,12 @@ class Player {
     // requests are host only
     requestShowOptions() {
         if (this.isHost())
-            this.connectedGame.sendAnsOptions();
+            this.connectedGame.pushAnsOptions();
     }
     requestNextQuestion() {
         if (this.isHost()){
             console.log("connected game: ", this.connectedGame);
-            this.connectedGame.sendQuestion();
+            this.connectedGame.pushQuestion();
         }
     }
     requestShowAnswer() {
@@ -148,6 +148,11 @@ class Player {
     }
     disconnect() {
         try {
+            this.name = undefined;
+            this.score = 0;
+            this.answer = undefined;
+            this.qFinishTime = undefined;
+
             if (this.connectedGame == undefined) return;
             if (this.isHost()) return endGame();
             // removes the player from the game
@@ -199,27 +204,30 @@ class Game {
 
     static addQuestionsFromString(questionsString) {
         // NOw, parse the questions
+        console.log("parsing question string"); 
         let questions = [];
         let lines = questionsString.split("\n");
         for (let element of lines) {
-            var row = element.split("\t");
-            if (row.length < 5) continue;
+            console.log("decoding line:",element);
+            var rows = element.split("\t");
+            console.log("got rows:",rows);
+            if (rows.length < 5) continue;
             var newQ = { ans: [], correct: [] };
-            newQ.question = row[0];
-            newQ.ans.push(row[1])// add answer 1
-            newQ.correct.push(row[2] == "y")// add if answer 1 correct
-            newQ.ans.push(row[3])// add answer 2
-            newQ.correct.push(row[4] == "y")
-            if (row.length >= 7 && row[5] != "") {
-                newQ.ans.push(row[5])// add (optional) answer 3
-                newQ.correct.push(row[6] == "y")
-                if (row.length >= 9 && row[7] != "") {
-                    newQ.ans.push(row[7])// add (optional) answer 4
-                    newQ.correct.push(row[8] == "y")
+            newQ.question = rows[0];
+            newQ.ans.push(rows[1])// add answer 1
+            newQ.correct.push(rows[2] == "y")// add if answer 1 correct
+            newQ.ans.push(rows[3])// add answer 2
+            newQ.correct.push(rows[4] == "y")
+            if (rows.length >= 7 && rows[5] != "") {
+                newQ.ans.push(rows[5])// add (optional) answer 3
+                newQ.correct.push(rows[6] == "y")
+                if (rows.length >= 9 && rows[7] != "") {
+                    newQ.ans.push(rows[7])// add (optional) answer 4
+                    newQ.correct.push(rows[8] == "y")
                 }
             }
-            if (row.length >= 10 && row[9] != "") {
-                newQ.image = row[9]
+            if (rows.length >= 10 && rows[9] != "") {
+                newQ.image = rows[9]
             }
             questions.push(newQ);
         };
@@ -247,18 +255,18 @@ class Game {
         new Player(socket);
     }
 
-    static addPlayer(game, player) {
+    addPlayer(player) {
         // exits early if it already has the player 
-        if (game.players.indexOf(player) != -1) return;
+        if (this.players.indexOf(player) != -1) return;
 
         // otherwise adds the player
         console.log("adding player");
-        game.players.push(player)
+        this.players.push(player)
         // sets the players defaults for this game
-        player.connectedGame = Game.findGame(game.id);
+        player.connectedGame = this; 
         player.score = 0;
         // sends a reply to both the host and the player 
-        game.host.send({ type: "addPlayer", name: player.name });
+        this.host.send({ type: "addPlayer", name: player.name });
         player.send({ type: "enterGame", });
     }
 
@@ -267,7 +275,16 @@ class Game {
     }
 
     removePlayer(player) {
-        let index = this.players.indexOf(player);
+        var index;
+        // if valid player disconnect from game 
+        if(!player)
+            return; 
+        player.connectedGame = undefined; 
+        
+        // return if the player is not part of the games players 
+        if((index = this.players.indexOf(player)) == -1)
+            return; 
+        //otherwise remove from the players list then send an update to the host
         this.players.splice(index, 1);
         // pushes the update to the host
         this.host.send({ type: "removePlayer", name: player.name });
@@ -401,20 +418,14 @@ class Game {
     // GAME CONTROLS
     deleteGame() {
         // deletes all references to itself.
-        this.players.forEach(ws => {
-            ws.connectedGame = undefined;
-            ws.name = "";
-            ws.score = 0;
-            ws.answer = undefined;
-            ws.qFinishTime = undefined;
-        })
+        this.players.forEach(player => player.disconnect());
         this.host.connectedGame = undefined;
         delete Game.games[this.id];
     }
     endGame() {
         // KICK EVERYONE FROM GAME
-        this.kickPlayers(ws.connectedGame.players, "Host Left.");
-        ws.connectedGame.deleteGame();
+        this.kickPlayers(this.players, "Host Left.");
+        this.deleteGame();
     }
 
     // game user control
